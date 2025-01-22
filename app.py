@@ -1,7 +1,11 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='torch')
+
 from flask import Flask, request, jsonify
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
 import requests
+import io
 
 # Flask Uygulaması
 app = Flask(__name__)
@@ -19,7 +23,9 @@ def get_embedding():
 
     try:
         # Görseli indir ve PIL Image olarak aç
-        image = Image.open(requests.get(image_url, stream=True).raw)
+        response = requests.get(image_url, stream=True)
+        response.raise_for_status()  # HTTP hatası olursa hata fırlat
+        image = Image.open(io.BytesIO(response.content))
 
         # Embedding hesaplama
         inputs = processor(images=image, return_tensors="pt", padding=True)
@@ -28,6 +34,8 @@ def get_embedding():
 
         return jsonify({"embedding": embedding}), 200
 
+    except requests.exceptions.RequestException as req_err:
+        return jsonify({"error": f"Resim indirilemedi: {str(req_err)}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
